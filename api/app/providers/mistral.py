@@ -199,18 +199,31 @@ class MistralProvider:
 
     # ------------------------------------------------------------------ util
     def _chat_json(self, model: str, messages: list[dict], schema: dict) -> dict[str, Any]:
-        resp = self._client.post(
-            "/chat/completions",
-            json={
+        """Ask for structured JSON. Tries schema-guided decoding first; if the
+        endpoint/model rejects the schema, falls back to plain json_object with
+        the schema described in the prompt. Robust for a first live call."""
+        for response_format in (
+            {"type": "json_schema",
+             "json_schema": {"name": "extraction", "schema": schema, "strict": False}},
+            {"type": "json_object"},
+        ):
+            body: dict[str, Any] = {
                 "model": model,
                 "messages": messages,
                 "temperature": 0.0,
-                "response_format": {
-                    "type": "json_schema",
-                    "json_schema": {"name": "extraction", "schema": schema, "strict": True},
-                },
-            },
-        )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-        return json.loads(content)
+                "response_format": response_format,
+            }
+            if response_format["type"] == "json_object":
+                body["messages"] = [
+                    *messages,
+                    {"role": "user",
+                     "content": "Return ONLY a JSON object matching this schema:\n"
+                                + json.dumps(schema)},
+                ]
+            resp = self._client.post("/chat/completions", json=body)
+            if resp.status_code == 422 and response_format["type"] == "json_schema":
+                continue  # model doesn't support json_schema — try json_object
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"]
+            return json.loads(content)
+        raise RuntimeError("structured output failed on both json_schema and json_object")
