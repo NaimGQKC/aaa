@@ -21,6 +21,8 @@ web/dist/
 # Local data / artifacts
 data/
 storage/
+sample_docs/*.pdf
+sample_docs/*.PDF
 *.sqlite3
 eval/results/
 scratch/
