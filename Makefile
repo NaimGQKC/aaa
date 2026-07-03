@@ -20,6 +20,9 @@ worker:  ## run a standalone queue worker
 web:  ## run the React dev server
 	cd web && npm install && npm run dev
 
+mistral-check:  ## verify the Mistral API key + models work (run where internet is open)
+	PYTHONPATH=$(PYTHONPATH_ALL) $(PY) scripts/mistral_check.py
+
 seed:  ## seed the synthetic demo deal end-to-end (offline)
 	PYTHONPATH=$(PYTHONPATH_ALL) $(PY) scripts/seed_demo.py
 
