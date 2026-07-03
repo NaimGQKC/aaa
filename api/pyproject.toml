@@ -1,0 +1,35 @@
+[project]
+name = "dd-api"
+version = "0.1.0"
+description = "EU-sovereign real-estate due-diligence pipeline — API + workers"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pydantic>=2.5",
+    "pydantic-settings>=2.2",
+    "sqlalchemy>=2.0.25",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1",
+    "pdfplumber>=0.11",
+    "fpdf2>=2.7",
+    "httpx>=0.27",
+    "rapidfuzz>=3.6",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1"]
+s3 = ["boto3>=1.34"]
+mistral = ["mistralai>=1.5"]
+reports = ["weasyprint>=61", "python-docx>=1.1"]
+dev = ["pytest>=8", "ruff>=0.4"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 100

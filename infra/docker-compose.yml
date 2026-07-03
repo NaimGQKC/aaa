@@ -1,0 +1,71 @@
+name: dd-platform
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dd
+      POSTGRES_PASSWORD: dd
+      POSTGRES_DB: dd
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dd"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: dd
+      MINIO_ROOT_PASSWORD: dd-secret-dd
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [miniodata:/data]
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    environment:
+      DD_PROVIDER: ${DD_PROVIDER:-local}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      DATABASE_URL: postgresql+psycopg://dd:dd@postgres:5432/dd
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: dd
+      S3_SECRET_KEY: dd-secret-dd
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_started }
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    command: python workers/worker.py
+    environment:
+      DD_PROVIDER: ${DD_PROVIDER:-local}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      DATABASE_URL: postgresql+psycopg://dd:dd@postgres:5432/dd
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: dd
+      S3_SECRET_KEY: dd-secret-dd
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_started }
+
+  web:
+    build:
+      context: ../web
+      dockerfile: ../infra/web.Dockerfile
+    ports: ["8080:80"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  miniodata:
