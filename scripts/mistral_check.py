@@ -146,7 +146,8 @@ def _tiny_pdf() -> bytes:
     pdf.set_creation_date(datetime(2026, 6, 1, tzinfo=timezone.utc))
     pdf.add_page()
     pdf.set_font("Helvetica", size=12)
-    pdf.cell(0, 20, "Mistral OCR test page — Registro de la Propiedad")
+    # ASCII only — the built-in Helvetica font can't encode chars like em-dash.
+    pdf.cell(0, 20, "Mistral OCR test page - Registro de la Propiedad")
     return bytes(pdf.output())
 
 
