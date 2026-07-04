@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
@@ -19,7 +19,20 @@ def get_engine():
             db_path = url.split("///", 1)[-1]
             if db_path and db_path != ":memory:":
                 Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-            _engine = create_engine(url, connect_args={"check_same_thread": False})
+            # check_same_thread=False: shared across the API request threads and
+            # the in-process worker thread. timeout + WAL + busy_timeout let a
+            # concurrent writer wait instead of erroring "database is locked".
+            _engine = create_engine(
+                url, connect_args={"check_same_thread": False, "timeout": 30}
+            )
+
+            @event.listens_for(_engine, "connect")
+            def _sqlite_pragmas(dbapi_conn, _rec):  # noqa: ANN001
+                cur = dbapi_conn.cursor()
+                cur.execute("PRAGMA journal_mode=WAL")
+                cur.execute("PRAGMA busy_timeout=30000")
+                cur.execute("PRAGMA synchronous=NORMAL")
+                cur.close()
         else:
             _engine = create_engine(url, pool_pre_ping=True)
         _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False)

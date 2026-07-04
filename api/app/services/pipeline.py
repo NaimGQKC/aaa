@@ -243,13 +243,36 @@ def finalize_deal(db: Session, deal_id: str) -> dict:
 
 def process_deal(db: Session, deal_id: str) -> dict:
     """Convenience: process every document then finalize (used by seed/eval
-    and the synchronous API path)."""
-    docs = db.execute(select(Document).where(Document.deal_id == deal_id)).scalars().all()
-    for d in docs:
+    and the synchronous API path).
+
+    Each document is committed on success and rolled back + marked failed on
+    error, so one bad document (e.g. an OCR/LLM error on a single file) cannot
+    abort the whole request or leave the session in a broken state."""
+    doc_ids = [
+        d.id for d in db.execute(
+            select(Document).where(Document.deal_id == deal_id)
+        ).scalars().all()
+    ]
+    for doc_id in doc_ids:
         try:
-            process_document(db, d.id)
-        except Exception as exc:  # dead-letter the doc, keep the deal going
-            log.exception("document %s failed", d.id)
-            d.status = "failed"
-            d.error = str(exc)
-    return finalize_deal(db, deal_id)
+            process_document(db, doc_id)
+            db.commit()
+        except Exception as exc:  # dead-letter this doc, keep the deal going
+            log.exception("document %s failed", doc_id)
+            db.rollback()
+            d = db.get(Document, doc_id)
+            if d is not None:
+                d.status = "failed"
+                d.error = str(exc)[:2000]
+                db.commit()
+    result = finalize_deal(db, deal_id)
+    db.commit()
+    failed = db.execute(
+        select(Document).where(
+            Document.deal_id == deal_id, Document.status == "failed"
+        )
+    ).scalars().all()
+    result["failed_documents"] = [
+        {"id": d.id, "filename": d.filename, "error": d.error} for d in failed
+    ]
+    return result
