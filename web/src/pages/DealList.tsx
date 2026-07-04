@@ -1,23 +1,44 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import type { Deal } from '../types'
 
 export default function DealList() {
+  const navigate = useNavigate()
   const [deals, setDeals] = useState<Deal[]>([])
   const [name, setName] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  const load = () => api.listDeals().then(setDeals).catch((e) => setError(String(e)))
+  const load = () =>
+    api
+      .listDeals()
+      .then(setDeals)
+      .catch((e) =>
+        setError(
+          `Cannot reach the backend at :8000 — make sure the API window is running. (${e})`,
+        ),
+      )
   useEffect(() => {
     load()
   }, [])
 
   const create = async () => {
-    if (!name.trim()) return
-    await api.createDeal(name.trim(), ['ES', 'FR'])
-    setName('')
-    load()
+    // Name is optional — default it so the button always does something.
+    const dealName = name.trim() || 'New deal'
+    setBusy(true)
+    setError('')
+    try {
+      const deal = await api.createDeal(dealName, ['ES', 'FR'])
+      setName('')
+      navigate(`/deals/${deal.id}`) // jump straight into the new deal
+    } catch (e) {
+      setError(
+        `Could not create the deal. Is the backend running? Open http://localhost:8000/health to check. (${e})`,
+      )
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -31,7 +52,9 @@ export default function DealList() {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && create()}
           />
-          <button onClick={create}>Create deal</button>
+          <button onClick={create} disabled={busy}>
+            {busy ? 'Creating…' : 'Create deal'}
+          </button>
         </div>
         {error && <p style={{ color: 'var(--high)' }}>{error}</p>}
         <table className="grid">
