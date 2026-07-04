@@ -1,11 +1,20 @@
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Report
+from app.models import Deal, Report
 from app.services.report import generate_report
 from app.storage import get_storage
+
+
+def _download_name(deal_name: str | None, created_at, ext: str) -> str:
+    """Human-friendly, timestamped filename e.g. DD-Report_New-deal_20260704-0012.pdf"""
+    safe = re.sub(r"[^A-Za-z0-9]+", "-", (deal_name or "deal")).strip("-") or "deal"
+    stamp = created_at.strftime("%Y%m%d-%H%M") if created_at else "report"
+    return f"DD-Report_{safe}_{stamp}.{ext}"
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
@@ -61,4 +70,12 @@ def download_report(report_id: str, ext: str, db: Session = Depends(get_db)) -> 
     key = {"html": r.storage_key_html, "pdf": r.storage_key_pdf, "docx": r.storage_key_docx}[ext]
     if not key:
         raise HTTPException(404, f"{ext} not generated for this report")
-    return Response(content=get_storage().get(key), media_type=MEDIA[ext])
+    deal = db.get(Deal, r.deal_id)
+    filename = _download_name(deal.name if deal else None, r.created_at, ext)
+    # HTML previews inline; PDF/DOCX download with the friendly name.
+    disposition = "inline" if ext == "html" else "attachment"
+    return Response(
+        content=get_storage().get(key),
+        media_type=MEDIA[ext],
+        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
+    )

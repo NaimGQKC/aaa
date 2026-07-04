@@ -214,18 +214,26 @@ export default function DealDashboard() {
         <h2>Reports</h2>
         {reports.map((r) => (
           <p key={r.id}>
-            <span className="mono">{r.id.slice(0, 8)}</span>{' '}
-            {r.formats.html && (
-              <a href={api.reportUrl(r.id, 'html')} target="_blank" rel="noreferrer">
-                HTML
-              </a>
-            )}{' '}
+            <span className="mono">{r.id.slice(0, 8)}</span>{'  '}
             {r.formats.pdf && (
               <a href={api.reportUrl(r.id, 'pdf')} target="_blank" rel="noreferrer">
-                PDF
+                <strong>⬇ PDF</strong>
               </a>
-            )}{' '}
-            {r.formats.docx && <a href={api.reportUrl(r.id, 'docx')}>DOCX</a>}
+            )}
+            {r.formats.docx && (
+              <>
+                {'  ·  '}
+                <a href={api.reportUrl(r.id, 'docx')}>Word</a>
+              </>
+            )}
+            {r.formats.html && (
+              <>
+                {'  ·  '}
+                <a href={api.reportUrl(r.id, 'html')} target="_blank" rel="noreferrer">
+                  view HTML
+                </a>
+              </>
+            )}
           </p>
         ))}
         {reports.length === 0 && <p className="muted">No reports generated yet.</p>}

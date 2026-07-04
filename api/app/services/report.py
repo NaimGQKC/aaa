@@ -207,7 +207,8 @@ def generate_report(db: Session, deal_id: str, actor: str = "report-service") ->
     db.add(report)
     db.flush()
 
-    html = TEMPLATE.render(
+    # One context, reused for HTML and PDF so the two never drift.
+    ctx = dict(
         deal=deal,
         report_id=report.id,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
@@ -223,20 +224,31 @@ def generate_report(db: Session, deal_id: str, actor: str = "report-service") ->
         ],
         audit_events=audit,
     )
+    html = TEMPLATE.render(**ctx)
     storage = get_storage()
     html_key = report_key(deal_id, report.id, "html")
     storage.put(html_key, ("<!doctype html><html><body>" + html + "</body></html>").encode())
     report.storage_key_html = html_key
 
-    try:  # optional: WeasyPrint PDF
+    # PDF: native fpdf2 builder (always available, cross-platform). WeasyPrint
+    # would render the HTML with higher fidelity but needs system libraries, so
+    # it's only a best-effort upgrade when installed.
+    pdf_bytes: bytes | None = None
+    try:
         from weasyprint import HTML  # type: ignore
 
         pdf_bytes = HTML(string=html).write_pdf()
+    except Exception:
+        try:
+            from app.services.pdf_report import build_pdf
+
+            pdf_bytes = build_pdf(ctx)
+        except Exception as exc:
+            log.warning("PDF export failed (%s) — HTML report only", exc)
+    if pdf_bytes:
         pdf_key = report_key(deal_id, report.id, "pdf")
         storage.put(pdf_key, pdf_bytes)
         report.storage_key_pdf = pdf_key
-    except Exception as exc:
-        log.info("PDF export unavailable (%s) — HTML report only", exc)
 
     try:  # optional: python-docx Word export
         report.storage_key_docx = _export_docx(

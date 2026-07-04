@@ -40,6 +40,7 @@ export const api = {
     req<ReportInfo>(`/api/deals/${dealId}/report`, { method: 'POST' }),
   listReports: (dealId: string) => req<ReportInfo[]>(`/api/deals/${dealId}/reports`),
   auditVerify: () => req<{ valid: boolean; events: number }>('/api/audit/verify'),
+  health: () => req<{ status: string; provider: string; storage: string }>('/health'),
   pdfUrl: (documentId: string) => `/api/documents/${documentId}/pdf`,
   reportUrl: (reportId: string, ext: string) => `/api/reports/${reportId}.${ext}`,
 }
