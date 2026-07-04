@@ -90,14 +90,22 @@ def test_report_and_audit(db_session, seeded_deal):
     assert verify_chain(db_session)["valid"] is True
 
 
-def test_review_requires_reason(app_env):
+def test_review_requires_reason_and_binds_identity(app_env):
     from fastapi.testclient import TestClient
 
     from app.main import app
 
     with TestClient(app) as client:
+        # unauthenticated -> everything is locked
+        assert client.get("/api/deals").status_code == 401
+
+        reg = client.post("/api/auth/register", json={
+            "email": "ana@fund.example", "name": "Ana", "password": "s3cret-pass"})
+        assert reg.status_code == 200
+
         r = client.post("/api/deals", json={"name": "d1", "jurisdiction": ["ES"]})
         assert r.status_code == 200
+        assert r.json()["my_role"] == "owner"
 
         from synthetic_docs import NOTA_SIMPLE, build_pdf
 
@@ -115,16 +123,17 @@ def test_review_requires_reason(app_env):
 
         # missing reason -> rejected (mandatory human-oversight rationale)
         bad = client.post(f"/api/findings/{fid}/review",
-                          json={"status": "overridden", "reason": "", "actor": "ana"})
+                          json={"status": "overridden", "reason": ""})
         assert bad.status_code == 422
 
         good = client.post(
             f"/api/findings/{fid}/review",
-            json={"status": "overridden", "reason": "verified against registry",
-                  "actor": "ana"},
+            json={"status": "overridden", "reason": "verified against registry"},
         )
         assert good.status_code == 200
         assert good.json()["human_status"] == "overridden"
+        # identity comes from the session, never from the request body
+        assert good.json()["human_actor"] == "ana@fund.example"
 
         chain = client.get("/api/audit/verify").json()
         assert chain["valid"] is True

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.db import init_db
-from app.routers import audit, deals, documents, findings, reports, spotchecks
+from app.routers import audit, auth, deals, documents, findings, reports, spotchecks
 from app.services.jobs import WorkerThread
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -40,6 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(deals.router)
 app.include_router(documents.router)
 app.include_router(findings.router)

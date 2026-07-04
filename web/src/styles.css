@@ -213,6 +213,17 @@ button:disabled { opacity: 0.5; cursor: default; }
   border-radius: 5px;
 }
 
+/* ---- login ---- */
+.login-wrap { display: flex; justify-content: center; padding-top: 8vh; }
+.login-card { width: 420px; }
+.login-fields { display: flex; flex-direction: column; gap: 0.6rem; margin: 1rem 0 0.5rem; }
+.login-fields input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
 /* ---- filter chips ---- */
 .chip-btn {
   background: #e8edf3;

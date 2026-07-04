@@ -52,7 +52,7 @@ export default function DocumentReview() {
     setScBusy(true)
     setScError('')
     try {
-      await api.submitSpotCheck(activeCheck.id, status, 'reviewer', scReason || undefined)
+      await api.submitSpotCheck(activeCheck.id, status, scReason || undefined)
       const remaining = spotChecks.filter(
         (c) => c.status === 'pending' && c.id !== activeCheck.id,
       )

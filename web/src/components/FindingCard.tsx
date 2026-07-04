@@ -26,7 +26,7 @@ export default function FindingCard({
     setBusy(true)
     setError('')
     try {
-      const updated = await api.reviewFinding(finding.id, status, reason, 'reviewer')
+      const updated = await api.reviewFinding(finding.id, status, reason)
       onReviewed?.(updated)
     } catch (e) {
       setError(String(e))

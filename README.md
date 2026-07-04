@@ -173,5 +173,12 @@ prompt/model version bump.
   before processing any real client document.
 - **Report parity**: install `api[reports]` extras (WeasyPrint/python-docx) or use
   the Docker image (deps included) for PDF/DOCX export.
-- **AuthN/Z + RLS**: single-tenant POC today; add Supabase RLS or an auth proxy
-  before multi-tenant pilots.
+- ~~AuthN/Z~~: **done** — accounts (salted PBKDF2-SHA256, httpOnly session
+  cookies) and GitHub-style per-deal collaboration: deals have members with
+  roles (owner / editor / reviewer / viewer), every route is access-scoped,
+  review + spot-check identity comes from the session (never typed), and
+  granting/revoking access is itself a hash-chained audit event. Legacy deals
+  with no members are claimed (audited) by the first user to open them.
+  **Still needed before a real pilot**: TLS everywhere (set the session
+  cookie's `secure` flag), email verification, rate limiting on login,
+  SSO/2FA for enterprise buyers.

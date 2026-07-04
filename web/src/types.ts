@@ -58,9 +58,25 @@ export interface Deal {
   name: string
   jurisdiction: string[]
   created_at: string
+  my_role: Role | null
   documents: DocumentSummary[]
   findings_by_severity: Record<Severity, number>
   oversight: OversightStats
+}
+
+export type Role = 'owner' | 'editor' | 'reviewer' | 'viewer'
+
+export interface User {
+  id: string
+  email: string
+  name: string
+}
+
+export interface Member {
+  user_id: string
+  email: string
+  name: string
+  role: Role
 }
 
 export interface Finding {

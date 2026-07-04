@@ -146,6 +146,44 @@ class AuditEvent(Base):
     hash: Mapped[str | None] = mapped_column(String(64))
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    email: Mapped[str] = mapped_column(Text, unique=True, index=True)
+    name: Mapped[str] = mapped_column(Text)
+    password_hash: Mapped[str] = mapped_column(Text)  # pbkdf2-sha256, salted
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SessionToken(Base):
+    __tablename__ = "session_tokens"
+
+    token: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class DealMember(Base):
+    """GitHub-style per-deal access: a deal is like a repo, members have roles.
+
+    owner    — everything, incl. managing members
+    editor   — upload documents, run the pipeline, plus everything below
+    reviewer — adjudicate findings/spot-checks, generate reports, plus below
+    viewer   — read-only (documents, findings, reports); for counterparties
+    """
+
+    __tablename__ = "deal_members"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    deal_id: Mapped[str] = mapped_column(ForeignKey("deals.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    role: Mapped[str] = mapped_column(Text, default="viewer")
+    invited_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class SpotCheck(Base):
     """Proof-of-Oversight spot-checks (anti-automation-bias, AI Act Art. 14(4)(b)).
 

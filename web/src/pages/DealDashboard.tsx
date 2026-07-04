@@ -4,7 +4,15 @@ import { api } from '../api'
 import FindingCard from '../components/FindingCard'
 import OversightPanel from '../components/OversightPanel'
 import SeverityBadge from '../components/SeverityBadge'
-import type { Deal, Finding, Reconciliation, ReportInfo, SpotCheck } from '../types'
+import type {
+  Deal,
+  Finding,
+  Member,
+  Reconciliation,
+  ReportInfo,
+  Role,
+  SpotCheck,
+} from '../types'
 
 type ReviewFilter = 'all' | 'pending' | 'reviewed'
 
@@ -16,6 +24,10 @@ export default function DealDashboard() {
   const [recon, setRecon] = useState<Reconciliation[]>([])
   const [reports, setReports] = useState<ReportInfo[]>([])
   const [spotChecks, setSpotChecks] = useState<SpotCheck[]>([])
+  const [members, setMembers] = useState<Member[]>([])
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<Role>('reviewer')
+  const [inviteError, setInviteError] = useState('')
   const [filter, setFilter] = useState<ReviewFilter>('all')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -26,7 +38,24 @@ export default function DealDashboard() {
     api.reconciliations(dealId).then(setRecon).catch(() => {})
     api.listReports(dealId).then(setReports).catch(() => {})
     api.spotChecks(dealId).then(setSpotChecks).catch(() => {})
+    api.members(dealId).then(setMembers).catch(() => {})
   }, [dealId])
+
+  const invite = async () => {
+    if (!inviteEmail.trim()) return
+    setInviteError('')
+    try {
+      await api.addMember(dealId, inviteEmail.trim(), inviteRole)
+      setInviteEmail('')
+      load()
+    } catch (e) {
+      setInviteError(
+        String(e).includes('404')
+          ? 'No account with that email — ask them to register first (Sign in → Create an account), then invite them.'
+          : String(e),
+      )
+    }
+  }
 
   useEffect(() => {
     load()
@@ -259,6 +288,73 @@ export default function DealDashboard() {
             <span className="muted"> — {f.description}</span>
           </p>
         ))}
+      </div>
+
+      <div className="panel">
+        <h2>
+          Team ({members.length})
+          <span className="muted" style={{ fontWeight: 400, fontSize: '.8rem' }}>
+            {' '}
+            — per-deal access, like repo collaborators. Roles: owner · editor (uploads &
+            runs) · reviewer (adjudicates & reports) · viewer (read-only, e.g. counterparty).
+          </span>
+        </h2>
+        <table className="grid">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              {deal.my_role === 'owner' && <th></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((m) => (
+              <tr key={m.user_id}>
+                <td>{m.name}</td>
+                <td className="mono">{m.email}</td>
+                <td>
+                  <span className="badge chip">{m.role}</span>
+                </td>
+                {deal.my_role === 'owner' && (
+                  <td>
+                    <button
+                      className="secondary"
+                      style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem' }}
+                      onClick={() =>
+                        api.removeMember(dealId, m.user_id).then(load).catch((e) => setInviteError(String(e)))
+                      }
+                    >
+                      remove
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {deal.my_role === 'owner' && (
+          <div className="review-row" style={{ marginTop: '0.7rem' }}>
+            <input
+              placeholder="Invite by email (they must register first)…"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && invite()}
+            />
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as Role)}
+              style={{ padding: '0.4rem', border: '1px solid var(--line)', borderRadius: 5 }}
+            >
+              <option value="viewer">viewer (read-only)</option>
+              <option value="reviewer">reviewer</option>
+              <option value="editor">editor</option>
+              <option value="owner">owner</option>
+            </select>
+            <button onClick={invite}>Invite</button>
+          </div>
+        )}
+        {inviteError && <p style={{ color: 'var(--high)' }}>{inviteError}</p>}
       </div>
 
       <div className="panel">

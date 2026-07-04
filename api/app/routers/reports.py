@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth_service import ensure_access, get_current_user
 from app.db import get_db
-from app.models import Deal, Report
+from app.models import Deal, Report, User
 from app.services.report import generate_report
 from app.storage import get_storage
 
@@ -26,8 +27,11 @@ MEDIA = {
 
 
 @router.post("/deals/{deal_id}/report")
-def create_report(deal_id: str, db: Session = Depends(get_db)) -> dict:
-    report = generate_report(db, deal_id)
+def create_report(
+    deal_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> dict:
+    ensure_access(db, user, deal_id, "reviewer")
+    report = generate_report(db, deal_id, actor=user.email)
     db.commit()
     return {
         "id": report.id,
@@ -41,7 +45,10 @@ def create_report(deal_id: str, db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/deals/{deal_id}/reports")
-def list_reports(deal_id: str, db: Session = Depends(get_db)) -> list[dict]:
+def list_reports(
+    deal_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> list[dict]:
+    ensure_access(db, user, deal_id, "viewer")
     rows = (
         db.execute(
             select(Report).where(Report.deal_id == deal_id).order_by(Report.created_at.desc())
@@ -61,12 +68,16 @@ def list_reports(deal_id: str, db: Session = Depends(get_db)) -> list[dict]:
 
 
 @router.get("/reports/{report_id}.{ext}")
-def download_report(report_id: str, ext: str, db: Session = Depends(get_db)) -> Response:
+def download_report(
+    report_id: str, ext: str,
+    db: Session = Depends(get_db), user: User = Depends(get_current_user),
+) -> Response:
     if ext not in MEDIA:
         raise HTTPException(400, f"unsupported format {ext}")
     r = db.get(Report, report_id)
     if r is None:
         raise HTTPException(404, "report not found")
+    ensure_access(db, user, r.deal_id, "viewer")
     key = {"html": r.storage_key_html, "pdf": r.storage_key_pdf, "docx": r.storage_key_docx}[ext]
     if not key:
         raise HTTPException(404, f"{ext} not generated for this report")
