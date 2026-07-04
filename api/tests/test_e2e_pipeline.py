@@ -120,6 +120,15 @@ def test_review_requires_reason_and_binds_identity(app_env):
         findings = client.get(f"/api/deals/{deal_id}/findings").json()
         assert findings
         fid = findings[0]["id"]
+        is_high = findings[0]["severity"] == "high"
+
+        # M2 gate: a high-severity finding can't be reviewed before its source
+        # is opened.
+        if is_high:
+            gated = client.post(f"/api/findings/{fid}/review",
+                                json={"status": "overridden", "reason": "x"})
+            assert gated.status_code == 409
+            assert client.post(f"/api/findings/{fid}/viewed").status_code == 200
 
         # missing reason -> rejected (mandatory human-oversight rationale)
         bad = client.post(f"/api/findings/{fid}/review",

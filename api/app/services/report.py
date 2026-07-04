@@ -71,6 +71,11 @@ TEMPLATE = Template(
   {{ oversight.spot_checks_matched }}/{{ oversight.spot_checks_done }}{% endif %}
   {% if oversight.reviewers %}· reviewers: {{ oversight.reviewers | join(', ') }}{% endif %}.
 </div>
+{% if certification %}
+<p class="meta" style="border-left:3px solid #1e7d43; padding:.4rem .8rem; font-style:italic;">
+  {{ certification }}
+</p>
+{% endif %}
 {% endif %}
 
 <h2>1. Executive summary</h2>
@@ -244,13 +249,25 @@ def generate_report(db: Session, deal_id: str, actor: str = "report-service") ->
     db.flush()
 
     from app.services.oversight import oversight_stats
+    from app.services.vigilance import certification_statement
 
     oversight = oversight_stats(db, deal_id)
+    # M8: a fully-reviewed report carries a pre-decisional, process-based
+    # certification by the named certifier (Lerner & Tetlock 1999) — recorded
+    # in the audit chain, not a discredited sign-at-the-top nudge.
+    certification = None
+    if not oversight["is_draft"]:
+        certification = certification_statement(actor)
+        record_event(
+            db, event_type="certification", actor=actor, deal_id=deal_id,
+            output_ref={"statement": certification, "report_id": report.id},
+        )
 
     # One context, reused for HTML and PDF so the two never drift.
     ctx = dict(
         deal=deal,
         oversight=oversight,
+        certification=certification,
         report_id=report.id,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         documents=doc_views,

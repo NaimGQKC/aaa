@@ -121,6 +121,12 @@ def build_pdf(ctx: dict) -> bytes:
     pdf.multi_cell(0, 16, _s(f"  {msg}"), border=1, fill=True,
                    new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(*INK)
+    if ctx.get("certification"):
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "I", 8.5)
+        pdf.set_text_color(*MUTED)
+        pdf.multi_cell(0, 12, _s(ctx["certification"]), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(*INK)
 
     # ---- 1. executive summary ---------------------------------------------
     _h1(pdf, "1. Executive summary")

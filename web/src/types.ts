@@ -79,6 +79,14 @@ export interface Member {
   role: Role
 }
 
+export interface Reliability {
+  n: number
+  verified: number
+  contested: number
+  rate: number | null
+  enough_data: boolean
+}
+
 export interface Finding {
   id: string
   deal_id: string
@@ -93,6 +101,28 @@ export interface Finding {
   human_status: 'pending' | 'accepted' | 'overridden'
   human_reason: string | null
   human_actor: string | null
+  source_viewed: boolean
+  review_gated: boolean
+  reliability?: Reliability | null
+}
+
+export interface VigilanceFlag {
+  level: 'warning' | 'info'
+  code: string
+  message: string
+}
+
+export interface VigilanceStats {
+  reviewed: number
+  accepted: number
+  overridden: number
+  override_rate: number | null
+  high_total: number
+  high_reviewed: number
+  high_source_open_rate: number | null
+  spot_checks_decided: number
+  spot_checks_mismatch: number
+  flags: VigilanceFlag[]
 }
 
 export interface Extraction {

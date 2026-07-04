@@ -75,11 +75,33 @@ export default function DocumentReview() {
   }
 
   const doc = deal?.documents.find((d) => d.id === documentId)
+  const canReview =
+    !!deal?.my_role && ['owner', 'editor', 'reviewer'].includes(deal.my_role)
   const docNames = useMemo(
     () => Object.fromEntries((deal?.documents ?? []).map((d) => [d.id, d.filename])),
     [deal],
   )
   const docFindings = findings.filter((f) => f.document_id === documentId)
+
+  // Arriving from the dashboard with ?finding=<id>: auto-open its source and
+  // (M2) mark it viewed so the disposition gate is satisfied in one flow.
+  const focusFindingId = searchParams.get('finding')
+  useEffect(() => {
+    if (!focusFindingId) return
+    const f = findings.find((x) => x.id === focusFindingId)
+    const c = f?.citations?.[0]
+    if (c?.document_id === documentId && c.page) {
+      setHighlight({ page: c.page, bbox: c.bbox })
+      if (f && !f.source_viewed) {
+        api
+          .markSourceViewed(f.id)
+          .then((updated) =>
+            setFindings((fs) => fs.map((x) => (x.id === updated.id ? updated : x))),
+          )
+          .catch(() => {})
+      }
+    }
+  }, [focusFindingId, findings.length, documentId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const focusField = (e: Extraction) => {
     setSelected(e.id)
@@ -168,8 +190,18 @@ export default function DocumentReview() {
                 onCitationClick={(c) => {
                   if (c.document_id === documentId && c.page) {
                     setHighlight({ page: c.page, bbox: c.bbox })
+                    // M2: viewing the cited source opens the disposition gate.
+                    if (!f.source_viewed) {
+                      api
+                        .markSourceViewed(f.id)
+                        .then((updated) =>
+                          setFindings((fs) => fs.map((x) => (x.id === updated.id ? updated : x))),
+                        )
+                        .catch(() => {})
+                    }
                   }
                 }}
+                canReview={canReview}
                 onReviewed={(updated) =>
                   setFindings((fs) => fs.map((x) => (x.id === updated.id ? updated : x)))
                 }

@@ -75,6 +75,31 @@ def test_roles_enforced_and_membership_audited(client):
     assert client.get("/api/audit/verify").json()["valid"] is True
 
 
+def test_duplicate_membership_prevented(app_env):
+    """The (deal_id, user_id) unique constraint prevents the duplicate rows
+    that the concurrent-first-open race used to create."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.auth_service import role_for
+    from app.db import session_factory
+    from app.models import Deal, DealMember, User
+
+    db = session_factory()()
+    try:
+        u = User(email="x@y.z", name="X", password_hash="h")
+        d = Deal(name="d", jurisdiction=[])
+        db.add_all([u, d])
+        db.flush()
+        db.add(DealMember(deal_id=d.id, user_id=u.id, role="owner"))
+        db.flush()
+        assert role_for(db, u, d.id) == "owner"
+        db.add(DealMember(deal_id=d.id, user_id=u.id, role="viewer"))
+        with pytest.raises(IntegrityError):
+            db.flush()
+    finally:
+        db.close()
+
+
 def test_cannot_remove_last_owner(client):
     _register(client, "solo@fund.example", "Solo")
     deal = client.post("/api/deals", json={"name": "d", "jurisdiction": []}).json()

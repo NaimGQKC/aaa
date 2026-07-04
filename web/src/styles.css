@@ -213,6 +213,27 @@ button:disabled { opacity: 0.5; cursor: default; }
   border-radius: 5px;
 }
 
+/* ---- M2 gate + vigilance ---- */
+.gate-note {
+  background: #fff8e6;
+  border: 1px solid #e6c96a;
+  border-radius: 6px;
+  padding: 0.45rem 0.7rem;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+.vigilance-metrics { display: flex; gap: 2rem; margin: 0.4rem 0 0.6rem; }
+.vitem .n { font-size: 1.5rem; font-weight: 750; }
+.vitem .muted { font-size: 0.78rem; }
+.vigilance-flag {
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  margin: 0.35rem 0;
+}
+.vigilance-flag.warning { background: #fdecea; border-left: 4px solid var(--high); color: #7a1712; }
+.vigilance-flag.info { background: #eef4fb; border-left: 4px solid var(--info); }
+
 /* ---- login ---- */
 .login-wrap { display: flex; justify-content: center; padding-top: 8vh; }
 .login-card { width: 420px; }

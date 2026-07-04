@@ -12,9 +12,11 @@ import type {
   ReportInfo,
   Role,
   SpotCheck,
+  VigilanceStats,
 } from '../types'
 
 type ReviewFilter = 'all' | 'pending' | 'reviewed'
+const REVIEW_ROLES: Role[] = ['owner', 'editor', 'reviewer']
 
 export default function DealDashboard() {
   const { dealId = '' } = useParams()
@@ -24,6 +26,7 @@ export default function DealDashboard() {
   const [recon, setRecon] = useState<Reconciliation[]>([])
   const [reports, setReports] = useState<ReportInfo[]>([])
   const [spotChecks, setSpotChecks] = useState<SpotCheck[]>([])
+  const [vigilance, setVigilance] = useState<VigilanceStats | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<Role>('reviewer')
@@ -38,6 +41,7 @@ export default function DealDashboard() {
     api.reconciliations(dealId).then(setRecon).catch(() => {})
     api.listReports(dealId).then(setReports).catch(() => {})
     api.spotChecks(dealId).then(setSpotChecks).catch(() => {})
+    api.vigilance(dealId).then(setVigilance).catch(() => {})
     api.members(dealId).then(setMembers).catch(() => {})
   }, [dealId])
 
@@ -119,6 +123,7 @@ export default function DealDashboard() {
   )
   const pendingChecks = spotChecks.filter((c) => c.status === 'pending')
   const o = deal.oversight
+  const canReview = !!deal.my_role && REVIEW_ROLES.includes(deal.my_role)
 
   return (
     <>
@@ -145,6 +150,46 @@ export default function DealDashboard() {
         <OversightPanel deal={deal} />
         {error && <p style={{ color: 'var(--high)' }}>{error}</p>}
       </div>
+
+      {vigilance && vigilance.reviewed > 0 && (
+        <div className="panel">
+          <h2>
+            Vigilance
+            <span className="muted" style={{ fontWeight: 400, fontSize: '.8rem' }}>
+              {' '}
+              — oversight-quality signals (AI Act Art. 26(5) monitoring). A very low override
+              rate is a warning, not a win.
+            </span>
+          </h2>
+          <div className="vigilance-metrics">
+            <div className="vitem">
+              <div className="n">
+                {vigilance.override_rate === null
+                  ? '—'
+                  : `${Math.round(vigilance.override_rate * 100)}%`}
+              </div>
+              <div className="muted">override rate ({vigilance.overridden}/{vigilance.reviewed})</div>
+            </div>
+            <div className="vitem">
+              <div className="n">
+                {vigilance.high_source_open_rate === null
+                  ? '—'
+                  : `${Math.round(vigilance.high_source_open_rate * 100)}%`}
+              </div>
+              <div className="muted">high-severity source opened</div>
+            </div>
+            <div className="vitem">
+              <div className="n">{vigilance.spot_checks_mismatch}</div>
+              <div className="muted">spot-check mismatches</div>
+            </div>
+          </div>
+          {vigilance.flags.map((fl) => (
+            <p key={fl.code} className={`vigilance-flag ${fl.level}`}>
+              {fl.level === 'warning' ? '⚠' : 'ℹ'} {fl.message}
+            </p>
+          ))}
+        </div>
+      )}
 
       {pendingChecks.length > 0 && (
         <div className="panel spotcheck-panel">
@@ -237,8 +282,10 @@ export default function DealDashboard() {
             key={f.id}
             finding={f}
             docNames={docNames}
+            canReview={canReview}
             onCitationClick={(c) =>
-              c.document_id && navigate(`/deals/${dealId}/documents/${c.document_id}`)
+              c.document_id &&
+              navigate(`/deals/${dealId}/documents/${c.document_id}?finding=${f.id}`)
             }
             onReviewed={() => load()}
           />

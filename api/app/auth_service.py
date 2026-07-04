@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, Request, Response
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -88,17 +89,24 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 # ---- per-deal authorization --------------------------------------------------
 def role_for(db: Session, user: User, deal_id: str) -> str | None:
-    m = db.execute(
+    # Tolerate historical duplicate rows defensively: return the highest role.
+    rows = db.execute(
         select(DealMember).where(
             DealMember.deal_id == deal_id, DealMember.user_id == user.id
         )
-    ).scalar_one_or_none()
-    return m.role if m else None
+    ).scalars().all()
+    if not rows:
+        return None
+    return max((r.role for r in rows), key=lambda r: ROLE_ORDER[r])
 
 
 def claim_if_orphan(db: Session, user: User, deal: Deal) -> str | None:
     """Deals created before auth existed have no members; the first
-    authenticated user to open one becomes its owner (audited)."""
+    authenticated user to open one becomes its owner (audited).
+
+    Concurrent first-open is real (the UI fires several requests at once), so
+    the check-then-insert is guarded by the (deal_id, user_id) unique
+    constraint: a losing race rolls back and re-reads the now-present role."""
     any_member = db.execute(
         select(DealMember).where(DealMember.deal_id == deal.id).limit(1)
     ).scalar_one_or_none()
@@ -106,13 +114,18 @@ def claim_if_orphan(db: Session, user: User, deal: Deal) -> str | None:
         return None
     from app.audit import record_event
 
-    db.add(DealMember(deal_id=deal.id, user_id=user.id, role="owner"))
-    record_event(
-        db, event_type="access_granted", actor=user.email, deal_id=deal.id,
-        output_ref={"user": user.email, "role": "owner", "reason": "legacy deal claimed"},
-    )
-    db.flush()
-    return "owner"
+    try:
+        db.add(DealMember(deal_id=deal.id, user_id=user.id, role="owner"))
+        record_event(
+            db, event_type="access_granted", actor=user.email, deal_id=deal.id,
+            output_ref={"user": user.email, "role": "owner",
+                        "reason": "legacy deal claimed"},
+        )
+        db.flush()
+        return "owner"
+    except IntegrityError:
+        db.rollback()
+        return role_for(db, user, deal.id)
 
 
 def ensure_access(db: Session, user: User, deal_id: str, min_role: str) -> str:

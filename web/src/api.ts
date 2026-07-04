@@ -7,6 +7,7 @@ import type {
   ReportInfo,
   SpotCheck,
   User,
+  VigilanceStats,
 } from './types'
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -45,6 +46,9 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, reason }),
     }),
+  markSourceViewed: (findingId: string) =>
+    req<Finding>(`/api/findings/${findingId}/viewed`, { method: 'POST' }),
+  vigilance: (dealId: string) => req<VigilanceStats>(`/api/deals/${dealId}/vigilance`),
   createReport: (dealId: string) =>
     req<ReportInfo>(`/api/deals/${dealId}/report`, { method: 'POST' }),
   listReports: (dealId: string) => req<ReportInfo[]>(`/api/deals/${dealId}/reports`),

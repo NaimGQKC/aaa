@@ -17,6 +17,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -126,6 +127,12 @@ class Finding(Base):
     human_status: Mapped[str] = mapped_column(Text, default="pending")  # pending|accepted|overridden
     human_reason: Mapped[str | None] = mapped_column(Text)
     human_actor: Mapped[str | None] = mapped_column(Text)
+    # M2 risk-tiered friction: for high-severity findings the disposition is
+    # gated on the reviewer actually opening the cited source span.
+    source_viewed: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_viewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -175,6 +182,7 @@ class DealMember(Base):
     """
 
     __tablename__ = "deal_members"
+    __table_args__ = (UniqueConstraint("deal_id", "user_id", name="uq_deal_member"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     deal_id: Mapped[str] = mapped_column(ForeignKey("deals.id"), index=True)

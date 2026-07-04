@@ -115,6 +115,33 @@ engineers vigilance instead of requesting it:
 - **Human oversight record** — a report section auditors can read: findings
   adjudicated, spot-check agreement, reviewers, status.
 
+### Engaged Review System (ERS) mechanics
+
+Built on the evidence that *explanations and confidence scores don't fix
+over-reliance but forcing functions do* (Buçinca 2021; Vasconcelos 2023), and
+that automation complacency is structural, not a willpower failure
+(Parasuraman & Manzey 2010):
+
+- **M2 — Risk-tiered confirmation friction:** a **high-severity** finding
+  cannot be dispositioned until the reviewer opens its cited source span.
+  Enforced server-side (409) and in the UI (Accept disabled + "open the source
+  to verify"); the source-view is a `source_viewed` audit event — the
+  substantive-oversight evidence for Art 14(4)(b). Medium/low are not gated
+  (risk-proportioned friction — aviation's "appropriate level of automation").
+- **M7 — Calibrated trust:** per-finding-category reliability computed from
+  *this deployment's own verified human dispositions* ("verified 94% · n=32"),
+  never raw model confidence.
+- **Vigilance instrumentation (Art 26(5) / 72):** override rate, high-severity
+  source-open rate, spot-check mismatches — and it flags a **near-zero override
+  rate as a warning**, not a win (the counterintuitive automation-bias signal).
+- **M8 — Certification:** a fully-reviewed report carries a pre-decisional,
+  process-based certification by the named certifier (Lerner & Tetlock 1999) —
+  recorded as a `certification` audit event. Explicitly **not** the discredited
+  sign-at-the-top nudge.
+
+Deferred (documented, not built): M1 full checklist-spine, M4 predict-before-
+reveal, M5 four-eyes rotation, M10 trust-calibration onboarding sandbox.
+
 ## Compliance engineering (the sales moat)
 
 This DD use case is very likely **not** Annex III high-risk (professional
