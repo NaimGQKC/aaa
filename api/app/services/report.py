@@ -55,6 +55,24 @@ TEMPLATE = Template(
 <p class="meta">Generated {{ generated_at }} · Jurisdictions: {{ deal.jurisdiction | join(', ') }}
  · {{ documents | length }} documents · report id {{ report_id }}</p>
 
+{% if oversight.is_draft %}
+<div style="border:3px solid #b3261e; background:#fdecea; color:#7a1712;
+            padding:.8rem 1rem; border-radius:6px; font-weight:700;">
+  DRAFT — {{ oversight.pending }} of {{ oversight.findings_total }} findings await human
+  review{% if oversight.spot_checks_done < oversight.spot_checks_total %},
+  {{ oversight.spot_checks_total - oversight.spot_checks_done }} spot-check(s) outstanding{% endif %}.
+  This report is not signed off.
+</div>
+{% else %}
+<div style="border:3px solid #1e7d43; background:#e9f7ef; color:#14532d;
+            padding:.8rem 1rem; border-radius:6px; font-weight:700;">
+  HUMAN-REVIEWED — all {{ oversight.findings_total }} findings adjudicated
+  {% if oversight.spot_checks_total %}· spot-check agreement
+  {{ oversight.spot_checks_matched }}/{{ oversight.spot_checks_done }}{% endif %}
+  {% if oversight.reviewers %}· reviewers: {{ oversight.reviewers | join(', ') }}{% endif %}.
+</div>
+{% endif %}
+
 <h2>1. Executive summary</h2>
 <p>{{ n_high }} high-severity, {{ n_medium }} medium-severity and {{ n_low_info }}
 low/informational findings across {{ documents | length }} documents.
@@ -125,7 +143,25 @@ replace legal advice.</p>
   {% endfor %}
 </table>
 
-<h2>6. Audit annex</h2>
+<h2>6. Human oversight record</h2>
+<p class="meta">Anti-automation-bias controls (EU AI Act Art. 14(4)(b)): findings are
+adjudicated by named reviewers with mandatory reasons; the system samples its own
+high-confidence extractions for human spot-checking.</p>
+<table>
+  <tr><th>Control</th><th>Status</th></tr>
+  <tr><td>Findings adjudicated</td>
+      <td>{{ oversight.findings_reviewed }} / {{ oversight.findings_total }}</td></tr>
+  <tr><td>Spot-checks completed</td>
+      <td>{{ oversight.spot_checks_done }} / {{ oversight.spot_checks_total }}</td></tr>
+  <tr><td>Spot-check agreement</td>
+      <td>{% if oversight.spot_checks_done %}{{ oversight.spot_checks_matched }}/{{ oversight.spot_checks_done }}{% else %}—{% endif %}</td></tr>
+  <tr><td>Reviewers</td>
+      <td>{{ oversight.reviewers | join(', ') if oversight.reviewers else '—' }}</td></tr>
+  <tr><td>Report status</td>
+      <td>{{ 'DRAFT' if oversight.is_draft else 'Human-reviewed' }}</td></tr>
+</table>
+
+<h2>7. Audit annex</h2>
 <p class="meta">Engineered to EU AI Act Article 12 (automatic record-keeping) and
 Article 26(6) (log retention ≥ 6 months). The audit log is an append-only
 hash chain; integrity is verifiable end-to-end.</p>
@@ -207,9 +243,14 @@ def generate_report(db: Session, deal_id: str, actor: str = "report-service") ->
     db.add(report)
     db.flush()
 
+    from app.services.oversight import oversight_stats
+
+    oversight = oversight_stats(db, deal_id)
+
     # One context, reused for HTML and PDF so the two never drift.
     ctx = dict(
         deal=deal,
+        oversight=oversight,
         report_id=report.id,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         documents=doc_views,

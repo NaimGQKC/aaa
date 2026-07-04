@@ -7,6 +7,7 @@ from app.db import get_db
 from app.models import Deal, Document, Finding, Reconciliation
 from app.services.ingestion import ingest_file, ingest_zip
 from app.services.jobs import enqueue_deal
+from app.services.oversight import oversight_stats
 from app.services.pipeline import process_deal
 
 router = APIRouter(prefix="/api/deals", tags=["deals"])
@@ -38,6 +39,7 @@ def _deal_view(db: Session, deal: Deal) -> dict:
             for d in docs
         ],
         "findings_by_severity": sev,
+        "oversight": oversight_stats(db, deal.id),
     }
 
 

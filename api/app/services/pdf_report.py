@@ -40,11 +40,19 @@ def _s(text: Any) -> str:
 
 
 class _Report(FPDF):
+    is_draft = False
+
     def footer(self) -> None:
         self.set_y(-28)
         self.set_font("Helvetica", size=7)
         self.set_text_color(*MUTED)
         self.cell(0, 10, f"Page {self.page_no()}/{{nb}}", align="C")
+        if self.is_draft:
+            # Accountability travels with every page of the artifact.
+            self.set_y(-28)
+            self.set_font("Helvetica", "B", 7)
+            self.set_text_color(*SEV_COLOR["high"])
+            self.cell(0, 10, "DRAFT - human review incomplete", align="R")
 
 
 def _h1(pdf: _Report, text: str) -> None:
@@ -61,7 +69,9 @@ def _h1(pdf: _Report, text: str) -> None:
 
 
 def build_pdf(ctx: dict) -> bytes:
+    oversight = ctx.get("oversight") or {}
     pdf = _Report(format="A4", unit="pt")
+    pdf.is_draft = bool(oversight.get("is_draft"))
     pdf.set_auto_page_break(True, margin=42)
     pdf.alias_nb_pages()
     pdf.set_margins(42, 42, 42)
@@ -82,6 +92,34 @@ def build_pdf(ctx: dict) -> bytes:
            f"{len(ctx['documents'])} documents · report id {ctx['report_id']}"),
         new_x="LMARGIN", new_y="NEXT",
     )
+    pdf.set_text_color(*INK)
+
+    # ---- oversight status banner (Law 4: the artifact carries the state) ---
+    pdf.ln(8)
+    if pdf.is_draft:
+        color, fill = SEV_COLOR["high"], (253, 236, 234)
+        outstanding = oversight.get("spot_checks_total", 0) - oversight.get("spot_checks_done", 0)
+        msg = (f"DRAFT - {oversight.get('pending', 0)} of "
+               f"{oversight.get('findings_total', 0)} findings await human review")
+        if outstanding > 0:
+            msg += f", {outstanding} spot-check(s) outstanding"
+        msg += ". This report is not signed off."
+    else:
+        color, fill = (30, 125, 67), (233, 247, 239)
+        msg = (f"HUMAN-REVIEWED - all {oversight.get('findings_total', 0)} findings "
+               f"adjudicated")
+        if oversight.get("spot_checks_done"):
+            msg += (f" · spot-check agreement {oversight.get('spot_checks_matched', 0)}"
+                    f"/{oversight.get('spot_checks_done', 0)}")
+        if oversight.get("reviewers"):
+            msg += f" · reviewers: {', '.join(oversight['reviewers'])}"
+    pdf.set_draw_color(*color)
+    pdf.set_fill_color(*fill)
+    pdf.set_text_color(*color)
+    pdf.set_font("Helvetica", "B", 9.5)
+    pdf.set_line_width(1.5)
+    pdf.multi_cell(0, 16, _s(f"  {msg}"), border=1, fill=True,
+                   new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(*INK)
 
     # ---- 1. executive summary ---------------------------------------------
@@ -199,8 +237,40 @@ def build_pdf(ctx: dict) -> bytes:
                 row.cell(_s(r.severity))
                 row.cell(_s(r.details)[:180])
 
-    # ---- 5. audit annex ----------------------------------------------------
-    _h1(pdf, "5. Audit annex")
+    # ---- 5. human oversight record ------------------------------------------
+    _h1(pdf, "5. Human oversight record")
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(*MUTED)
+    pdf.multi_cell(
+        0, 11,
+        _s("Anti-automation-bias controls (EU AI Act Art. 14(4)(b)): findings are "
+           "adjudicated by named reviewers with mandatory reasons; the system "
+           "samples its own high-confidence extractions for human spot-checking."),
+        new_x="LMARGIN", new_y="NEXT",
+    )
+    pdf.set_text_color(*INK)
+    pdf.ln(2)
+    pdf.set_font("Helvetica", size=8.5)
+    sc_done = oversight.get("spot_checks_done", 0)
+    rows = [
+        ("Findings adjudicated",
+         f"{oversight.get('findings_reviewed', 0)} / {oversight.get('findings_total', 0)}"),
+        ("Spot-checks completed",
+         f"{sc_done} / {oversight.get('spot_checks_total', 0)}"),
+        ("Spot-check agreement",
+         f"{oversight.get('spot_checks_matched', 0)}/{sc_done}" if sc_done else "-"),
+        ("Reviewers", ", ".join(oversight.get("reviewers") or []) or "-"),
+        ("Report status", "DRAFT" if pdf.is_draft else "Human-reviewed"),
+    ]
+    with pdf.table(width=pdf.epw * 0.7, col_widths=(40, 60),
+                   first_row_as_headings=False, line_height=13) as table:
+        for label, value in rows:
+            r = table.row()
+            r.cell(label)
+            r.cell(_s(value))
+
+    # ---- 6. audit annex ----------------------------------------------------
+    _h1(pdf, "6. Audit annex")
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(*MUTED)
     pdf.multi_cell(

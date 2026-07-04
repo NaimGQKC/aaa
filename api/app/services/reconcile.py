@@ -85,8 +85,12 @@ def _add(
 
 def run_reconciliation(db: Session, deal: Deal) -> int:
     db.query(Reconciliation).filter(Reconciliation.deal_id == deal.id).delete()
+    # Rebuild machine-generated findings — but never delete human-originated
+    # ones (spot-check mismatches): a pipeline re-run must not erase oversight.
     db.query(Finding).filter(
-        Finding.deal_id == deal.id, Finding.rule_key.isnot(None)
+        Finding.deal_id == deal.id,
+        Finding.rule_key.isnot(None),
+        Finding.rule_key != "spot_check",
     ).delete()
 
     ex = _extractions(db, deal.id)

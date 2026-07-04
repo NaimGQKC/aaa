@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import FindingCard from '../components/FindingCard'
+import OversightPanel from '../components/OversightPanel'
 import SeverityBadge from '../components/SeverityBadge'
-import type { Deal, Finding, Reconciliation, ReportInfo } from '../types'
+import type { Deal, Finding, Reconciliation, ReportInfo, SpotCheck } from '../types'
+
+type ReviewFilter = 'all' | 'pending' | 'reviewed'
 
 export default function DealDashboard() {
   const { dealId = '' } = useParams()
@@ -12,6 +15,8 @@ export default function DealDashboard() {
   const [findings, setFindings] = useState<Finding[]>([])
   const [recon, setRecon] = useState<Reconciliation[]>([])
   const [reports, setReports] = useState<ReportInfo[]>([])
+  const [spotChecks, setSpotChecks] = useState<SpotCheck[]>([])
+  const [filter, setFilter] = useState<ReviewFilter>('all')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -20,6 +25,7 @@ export default function DealDashboard() {
     api.findings(dealId).then(setFindings).catch(() => {})
     api.reconciliations(dealId).then(setRecon).catch(() => {})
     api.listReports(dealId).then(setReports).catch(() => {})
+    api.spotChecks(dealId).then(setSpotChecks).catch(() => {})
   }, [dealId])
 
   useEffect(() => {
@@ -72,10 +78,18 @@ export default function DealDashboard() {
 
   if (!deal) return <p className="muted">{error || 'Loading…'}</p>
 
-  const sev = deal.findings_by_severity
   const epcFindings = findings.filter(
     (f) => f.category.startsWith('epc') || f.category.startsWith('epbd'),
   )
+  const visibleFindings = findings.filter((f) =>
+    filter === 'all'
+      ? true
+      : filter === 'pending'
+        ? f.human_status === 'pending'
+        : f.human_status !== 'pending',
+  )
+  const pendingChecks = spotChecks.filter((c) => c.status === 'pending')
+  const o = deal.oversight
 
   return (
     <>
@@ -87,30 +101,50 @@ export default function DealDashboard() {
           <button disabled={busy} className="secondary" onClick={runPipeline}>
             Re-run pipeline
           </button>
-          <button disabled={busy} onClick={makeReport}>
-            Generate report
+          <button
+            disabled={busy}
+            onClick={makeReport}
+            title={
+              o.is_draft
+                ? `The report will be stamped DRAFT — ${o.pending} finding(s) unreviewed`
+                : 'All findings reviewed — the report exports as HUMAN-REVIEWED'
+            }
+          >
+            {o.is_draft ? 'Generate report (draft)' : 'Generate report'}
           </button>
         </div>
-        <div className="kpi" style={{ marginTop: '0.8rem' }}>
-          <div className="item">
-            <div className="n" style={{ color: 'var(--high)' }}>{sev.high ?? 0}</div>
-            <div className="muted">high</div>
-          </div>
-          <div className="item">
-            <div className="n" style={{ color: 'var(--medium)' }}>{sev.medium ?? 0}</div>
-            <div className="muted">medium</div>
-          </div>
-          <div className="item">
-            <div className="n">{(sev.low ?? 0) + (sev.info ?? 0)}</div>
-            <div className="muted">low / info</div>
-          </div>
-          <div className="item">
-            <div className="n">{deal.documents.length}</div>
-            <div className="muted">documents</div>
-          </div>
-        </div>
+        <OversightPanel deal={deal} />
         {error && <p style={{ color: 'var(--high)' }}>{error}</p>}
       </div>
+
+      {pendingChecks.length > 0 && (
+        <div className="panel spotcheck-panel">
+          <h2>
+            Spot-check queue ({pendingChecks.length})
+            <span className="muted" style={{ fontWeight: 400, fontSize: '.8rem' }}>
+              {' '}
+              — verify a few of the AI's own high-confidence answers against the source.
+              ~10 seconds each; keeps the reviewed stamp honest.
+            </span>
+          </h2>
+          {pendingChecks.map((c) => (
+            <div key={c.id} className="spotcheck-row">
+              <span className="mono">{c.field_path}</span>
+              <span className="spotcheck-value">{String(c.value ?? '—')}</span>
+              <span className="muted">p.{c.page ?? '?'}</span>
+              <span className="spacer" />
+              <button
+                className="secondary"
+                onClick={() =>
+                  navigate(`/deals/${dealId}/documents/${c.document_id}?spotcheck=${c.id}`)
+                }
+              >
+                Verify against source →
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="panel">
         <h2>Documents</h2>
@@ -155,8 +189,21 @@ export default function DealDashboard() {
       </div>
 
       <div className="panel">
-        <h2>Findings ({findings.length})</h2>
-        {findings.map((f) => (
+        <div className="flex" style={{ marginBottom: '.6rem' }}>
+          <h2 style={{ margin: 0 }}>Findings ({visibleFindings.length})</h2>
+          <span className="spacer" />
+          {(['all', 'pending', 'reviewed'] as ReviewFilter[]).map((f) => (
+            <button
+              key={f}
+              className={`chip-btn ${filter === f ? 'active' : ''}`}
+              onClick={() => setFilter(f)}
+            >
+              {f}
+              {f === 'pending' && o.pending > 0 && ` (${o.pending})`}
+            </button>
+          ))}
+        </div>
+        {visibleFindings.map((f) => (
           <FindingCard
             key={f.id}
             finding={f}
@@ -167,8 +214,12 @@ export default function DealDashboard() {
             onReviewed={() => load()}
           />
         ))}
-        {findings.length === 0 && (
-          <p className="muted">No findings yet — upload documents and run the pipeline.</p>
+        {visibleFindings.length === 0 && (
+          <p className="muted">
+            {findings.length === 0
+              ? 'No findings yet — upload documents and run the pipeline.'
+              : 'Nothing in this filter.'}
+          </p>
         )}
       </div>
 

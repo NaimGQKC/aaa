@@ -146,6 +146,29 @@ class AuditEvent(Base):
     hash: Mapped[str | None] = mapped_column(String(64))
 
 
+class SpotCheck(Base):
+    """Proof-of-Oversight spot-checks (anti-automation-bias, AI Act Art. 14(4)(b)).
+
+    The system deterministically samples a few of its own HIGH-confidence
+    extractions per deal and asks the reviewer to verify each against the
+    highlighted source clause. This keeps human sampling honest precisely
+    where complacency strikes (confident answers nobody would re-check), and
+    yields a measured per-deal agreement rate for the oversight record."""
+
+    __tablename__ = "spot_checks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    deal_id: Mapped[str] = mapped_column(String(36), index=True)
+    document_id: Mapped[str] = mapped_column(String(36))
+    extraction_id: Mapped[str] = mapped_column(String(36))  # no FK: extractions are rebuilt on re-runs
+    field_path: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, default="pending")  # pending|match|mismatch
+    actor: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class StageRun(Base):
     """Idempotency ledger: one row per (document, stage, model, prompt) run.
 

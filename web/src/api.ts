@@ -1,4 +1,11 @@
-import type { Deal, Extraction, Finding, Reconciliation, ReportInfo } from './types'
+import type {
+  Deal,
+  Extraction,
+  Finding,
+  Reconciliation,
+  ReportInfo,
+  SpotCheck,
+} from './types'
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(path, init)
@@ -41,6 +48,13 @@ export const api = {
   listReports: (dealId: string) => req<ReportInfo[]>(`/api/deals/${dealId}/reports`),
   auditVerify: () => req<{ valid: boolean; events: number }>('/api/audit/verify'),
   health: () => req<{ status: string; provider: string; storage: string }>('/health'),
+  spotChecks: (dealId: string) => req<SpotCheck[]>(`/api/deals/${dealId}/spotchecks`),
+  submitSpotCheck: (id: string, status: 'match' | 'mismatch', actor: string, reason?: string) =>
+    req<SpotCheck>(`/api/spotchecks/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, actor, reason }),
+    }),
   pdfUrl: (documentId: string) => `/api/documents/${documentId}/pdf`,
   reportUrl: (reportId: string, ext: string) => `/api/reports/${reportId}.${ext}`,
 }

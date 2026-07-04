@@ -92,6 +92,29 @@ landlord (fuzzy identity match, jurisdiction-scoped, catastral-ref paired),
 surfaces (10% divergence), break dates. Unknown/exotic documents are **abstained
 and routed to human review — never guessed** (tiered-confidence design).
 
+## Proof of Oversight (anti-automation-bias UX)
+
+Disclaimers ("please verify AI output") don't change behavior — automation
+complacency is the most-replicated failure mode in human-factors research, and
+EU AI Act Art. 14(4)(b) explicitly requires guarding against it. This platform
+engineers vigilance instead of requesting it:
+
+- **Verification is one click** — every field/finding highlights its exact
+  source clause (checking must be cheaper than trusting).
+- **Absence has a UI** — abstained fields say "I don't know" instead of guessing.
+- **Spot-checks** — the system deterministically samples its own
+  *high-confidence* extractions (the answers nobody would re-check) and asks
+  the reviewer to verify them against the highlighted source; a mismatch
+  auto-escalates to a high-severity finding, and the per-deal agreement rate
+  becomes a measured oversight metric.
+- **The artifact carries the oversight state** — reports export stamped
+  **DRAFT — n findings await human review** (page 1 + every footer) until every
+  finding is adjudicated and spot-checks are done; then they export
+  **HUMAN-REVIEWED** with named reviewers and the agreement rate. Social
+  accountability, not warnings.
+- **Human oversight record** — a report section auditors can read: findings
+  adjudicated, spot-check agreement, reviewers, status.
+
 ## Compliance engineering (the sales moat)
 
 This DD use case is very likely **not** Annex III high-risk (professional

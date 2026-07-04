@@ -25,6 +25,34 @@ export interface DocumentSummary {
   classification_confidence: number
 }
 
+export interface OversightStats {
+  findings_total: number
+  findings_reviewed: number
+  pending_high: number
+  pending: number
+  spot_checks_total: number
+  spot_checks_done: number
+  spot_checks_matched: number
+  reviewers: string[]
+  is_draft: boolean
+}
+
+export interface SpotCheck {
+  id: string
+  deal_id: string
+  document_id: string
+  extraction_id: string
+  field_path: string
+  value: unknown
+  text_span: string | null
+  page: number | null
+  bbox: Bbox | null
+  confidence: number
+  status: 'pending' | 'match' | 'mismatch'
+  actor: string | null
+  reason: string | null
+}
+
 export interface Deal {
   id: string
   name: string
@@ -32,6 +60,7 @@ export interface Deal {
   created_at: string
   documents: DocumentSummary[]
   findings_by_severity: Record<Severity, number>
+  oversight: OversightStats
 }
 
 export interface Finding {
